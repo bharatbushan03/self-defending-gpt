@@ -4,6 +4,7 @@ from app.models.prompt import PromptResponse, PromptRequest
 from app.security.analyzer import analyze_prompt
 from app.security.decision import make_decision
 from app.services.logger import log_event, get_logs
+from app.services.trust import update_trust, get_or_create_user
 
 app = FastAPI()
 
@@ -22,13 +23,17 @@ def home():
 @app.post("/analyze-prompt", response_model=PromptResponse)
 def analyze(request: PromptRequest):
     analysis = analyze_prompt(request.prompt)
-    decision = make_decision(analysis)
+
+    trust_score = update_trust(request.user_id, analysis["label"])
+
+    decision = make_decision(analysis, trust_score)
     
     log_event(request.prompt, analysis, decision)
 
     return {
         **analysis,
-        **decision
+        **decision,
+        "trust_score": trust_score
     }
 
 @app.get("/logs")

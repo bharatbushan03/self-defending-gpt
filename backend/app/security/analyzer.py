@@ -38,7 +38,7 @@ def analyze_prompt(prompt: str):
     elif score >= 30:
         label = "Suspicious"
     else:
-        label = "safe"
+        label = "Safe"
 
     return {
         "label": label,
