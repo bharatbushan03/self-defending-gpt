@@ -1,19 +1,34 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.models.prompt import PromptResponse, PromptRequest
-from app.models.chat import ChatResponse
-from app.security.analyzer import analyze_prompt
-from app.security.decision import make_decision
-from app.services.logger import log_event, get_logs
-from app.services.trust import update_trust, get_or_create_user
-from app.services.chat import generate_response
-from app.services.memory import save_message, get_chat_history
-from app.services.analytics import (
-    get_risk_distribution,
-    get_attack_trends,
-    get_top_risky_users
-)
+try:
+    from app.models.prompt import PromptResponse, PromptRequest
+    from app.models.chat import ChatResponse
+    from app.security.analyzer import analyze_prompt
+    from app.security.decision import make_decision
+    from app.services.logger import log_event, get_logs
+    from app.services.trust import update_trust, get_or_create_user
+    from app.services.chat import generate_response
+    from app.services.memory import save_message, get_chat_history
+    from app.services.analytics import (
+        get_risk_distribution,
+        get_attack_trends,
+        get_top_risky_users,
+    )
+except ModuleNotFoundError:
+    from backend.app.models.prompt import PromptResponse, PromptRequest
+    from backend.app.models.chat import ChatResponse
+    from backend.app.security.analyzer import analyze_prompt
+    from backend.app.security.decision import make_decision
+    from backend.app.services.logger import log_event, get_logs
+    from backend.app.services.trust import update_trust, get_or_create_user
+    from backend.app.services.chat import generate_response
+    from backend.app.services.memory import save_message, get_chat_history
+    from backend.app.services.analytics import (
+        get_risk_distribution,
+        get_attack_trends,
+        get_top_risky_users,
+    )
 
 app = FastAPI()
 
