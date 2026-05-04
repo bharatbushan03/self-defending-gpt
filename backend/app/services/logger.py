@@ -7,7 +7,7 @@ def log_event(prompt, analysis, decision):
         "label": analysis["label"],
         "risk_score": analysis["risk_score"],
         "action": decision["action"],
-        "timestamp": datetime.utcnow().isoformat()
+        "timestamp": datetime.utcnow()
     }
 
     logs_collection.insert_one(entry)

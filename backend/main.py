@@ -8,6 +8,11 @@ from app.services.logger import log_event, get_logs
 from app.services.trust import update_trust, get_or_create_user
 from app.services.chat import generate_response
 from app.services.memory import save_message, get_chat_history
+from app.services.analytics import (
+    get_risk_distribution,
+    get_attack_trends,
+    get_top_risky_users
+)
 
 app = FastAPI()
 
@@ -69,6 +74,17 @@ def chat(request: PromptRequest):
         "trust_score": trust_score
     }
 
+@app.get("/analytics/risk-distribution")
+def risk_distribution():
+    return get_risk_distribution()
+
+@app.get("/analytics/attack-trends")
+def attack_trends():
+    return get_attack_trends()
+
+@app.get("/analytics/top-users")
+def top_users():
+    return get_top_risky_users()
 
 @app.get("/logs")
 def fetch_logs():

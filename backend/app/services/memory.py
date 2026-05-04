@@ -1,3 +1,4 @@
+from datetime import datetime
 from app.core.db import db
 
 chat_collection = db["chat_history"]
@@ -13,5 +14,5 @@ def save_message(user_id: str, role: str, content: str):
         "user_id": user_id,
         "role": role,
         "content": content,
-        "timestamp": db.client.server_info()["localTime"]
+        "timestamp": datetime.utcnow()
     })
