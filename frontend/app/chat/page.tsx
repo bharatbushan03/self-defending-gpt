@@ -2,6 +2,8 @@
 
 import { useState, useRef, useEffect } from "react";
 
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+
 export default function Chat() {
   const [prompt, setPrompt] = useState("");
   const [messages, setMessages] = useState<any[]>([]);
@@ -13,7 +15,7 @@ export default function Chat() {
 
     setLoading(true);
 
-    const res = await fetch("http://127.0.0.1:8000/chat", {
+    const res = await fetch(`${API_BASE}/chat`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
