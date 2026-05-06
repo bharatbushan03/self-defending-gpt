@@ -1,8 +1,9 @@
 from datetime import datetime
-from app.core.db import logs_collection
+from ..core.db import logs_collection
 
-def log_event(prompt, analysis, decision):
+def log_event(user_id, prompt, analysis, decision):
     entry = {
+        "user_id": user_id,
         "prompt": prompt,
         "label": analysis["label"],
         "risk_score": analysis["risk_score"],

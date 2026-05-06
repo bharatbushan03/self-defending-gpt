@@ -7,23 +7,26 @@ try:
     from app.security.analyzer import analyze_prompt
     from app.security.decision import make_decision
     from app.services.logger import log_event, get_logs
-    from app.services.trust import update_trust, get_or_create_user
+    from app.services.trust import update_trust
     from app.services.chat import generate_response
-    from app.services.memory import save_message, get_chat_history
+    from app.services.memory import save_message
     from app.services.analytics import (
         get_risk_distribution,
         get_attack_trends,
         get_top_risky_users,
     )
-except ModuleNotFoundError:
+except ModuleNotFoundError as exc:
+    if exc.name != "app":
+        raise
+
     from backend.app.models.prompt import PromptResponse, PromptRequest
     from backend.app.models.chat import ChatResponse
     from backend.app.security.analyzer import analyze_prompt
     from backend.app.security.decision import make_decision
     from backend.app.services.logger import log_event, get_logs
-    from backend.app.services.trust import update_trust, get_or_create_user
+    from backend.app.services.trust import update_trust
     from backend.app.services.chat import generate_response
-    from backend.app.services.memory import save_message, get_chat_history
+    from backend.app.services.memory import save_message
     from backend.app.services.analytics import (
         get_risk_distribution,
         get_attack_trends,
@@ -57,7 +60,7 @@ def analyze(request: PromptRequest):
 
     decision = make_decision(analysis, trust_score)
     
-    log_event(request.prompt, analysis, decision)
+    log_event(request.user_id, request.prompt, analysis, decision)
 
     return {
         **analysis,
@@ -65,12 +68,12 @@ def analyze(request: PromptRequest):
         "trust_score": trust_score
     }
 
-@app.post("/chat", response_model = ChatResponse)
+@app.post("/chat", response_model=ChatResponse)
 def chat(request: PromptRequest):
     analysis = analyze_prompt(request.prompt)
     trust_score = update_trust(request.user_id, analysis["label"])
     decision = make_decision(analysis, trust_score)
-    log_event(request.prompt, analysis, decision)
+    log_event(request.user_id, request.prompt, analysis, decision)
 
     if decision["action"] == "BLOCK":
         return {
@@ -78,7 +81,8 @@ def chat(request: PromptRequest):
             "action": decision["action"],
             "message": decision["message"],
             "risk_score": analysis["risk_score"],
-            "trust_score": trust_score
+            "trust_score": trust_score,
+            "reauth_required": decision["reauth_required"]
         }
     
     save_message(request.user_id, "user", request.prompt)
@@ -92,7 +96,8 @@ def chat(request: PromptRequest):
         "action": decision["action"],
         "message": decision["message"],
         "risk_score": analysis["risk_score"],
-        "trust_score": trust_score
+        "trust_score": trust_score,
+        "reauth_required": decision["reauth_required"]
     }
 
 @app.get("/analytics/risk-distribution")

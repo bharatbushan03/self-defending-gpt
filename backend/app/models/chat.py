@@ -6,3 +6,4 @@ class ChatResponse(BaseModel):
     message: str
     risk_score: int
     trust_score: int
+    reauth_required: bool

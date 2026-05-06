@@ -1,6 +1,7 @@
-from app.core.db import logs_collection
 from collections import Counter
 from datetime import datetime, timedelta
+
+from ..core.db import logs_collection
 
 LABEL_MAP = {
     "safe": "Safe",
@@ -71,7 +72,7 @@ def get_top_risky_users():
 
     for log in logs:
         user = log.get("user_id", "unknown")
-        score = log["risk_score"]
+        score = log.get("risk_score", 0)
 
         user_scores[user] = user_scores.get(user, 0) + score
 

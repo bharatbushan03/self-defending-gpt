@@ -1,11 +1,12 @@
-from app.security.ai_analyzer import ai_classify_prompt
 import re
+
+from .ai_analyzer import ai_classify_prompt
 
 INJECTION_PATTERNS = [
     r"ignore previous instructions",
     r"disregard above",
     r"act as",
-    r"pretent to be",
+    r"pretend to be",
     r"you are now"
 ]
 

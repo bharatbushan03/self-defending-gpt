@@ -1,4 +1,4 @@
-from app.core.db import db
+from ..core.db import db
 
 users_collection = db["users"]
 

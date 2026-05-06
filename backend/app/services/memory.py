@@ -1,12 +1,13 @@
 from datetime import datetime
-from app.core.db import db
+from ..core.db import db
 
 chat_collection = db["chat_history"]
 
-def get_chat_history(user_id: str, limit = 10):
+def get_chat_history(user_id: str, limit=10):
     chats = list(
-        chat_collection.find({"user_id": user_id}, {"_id": 0}).sort("timestamp", 1).limit(limit)
+        chat_collection.find({"user_id": user_id}, {"_id": 0}).sort("timestamp", -1).limit(limit)
     )
+    chats.reverse()
     return chats
 
 def save_message(user_id: str, role: str, content: str):
