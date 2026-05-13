@@ -1,6 +1,7 @@
 fastapi
-uvicorn
-pydantic
+uvicorn[standard]
 pymongo
-langchain_nvidia_ai_endpoints
 python-dotenv
+requests
+pydantic
+langchain_nvidia_ai_endpoints
