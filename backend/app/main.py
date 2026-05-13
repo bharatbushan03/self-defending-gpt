@@ -2,8 +2,10 @@ from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
+from pydantic import BaseModel
 
 from app.core.db import connect_to_mongo, close_mongo_connection, ping_database
+from app.security.rule_analyzer import analyze_prompt as rule_based_analysis
 
 load_dotenv()
 
@@ -29,6 +31,9 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+class PromptAnalysisRequest(BaseModel):
+    prompt: str
+
 @app.get("/", tags=["Health Check"])
 async def root():
     """
@@ -45,4 +50,12 @@ async def db_health():
     if is_connected:
         return {"status": "ok", "database_connection": "successful"}
     return {"status": "error", "database_connection": "failed"}
+
+@app.post("/analyze-prompt", tags=["Security"])
+async def analyze_prompt_endpoint(request: PromptAnalysisRequest):
+    """
+    Analyzes a prompt using the rule-based security analyzer.
+    """
+    return rule_based_analysis(request.prompt)
+
 
