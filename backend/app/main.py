@@ -3,13 +3,15 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
 from pydantic import BaseModel
-from typing import Dict
+from typing import Dict, List
 
 from app.core.db import connect_to_mongo, close_mongo_connection, ping_database
 from app.security.risk_engine import calculate_hybrid_risk
 from app.services.trust_service import update_trust_score
 from app.security.decision_engine import make_decision
 from app.models.decision import Decision
+from app.services.logging_service import log_security_event, get_logs as get_logs_service
+from app.models.log import SecurityLog
 
 load_dotenv()
 
@@ -64,7 +66,7 @@ async def db_health():
 @app.post("/analyze-prompt", response_model=PromptAnalysisResponse, tags=["Security"])
 async def analyze_prompt_endpoint(request: PromptAnalysisRequest):
     """
-    Analyzes a prompt, updates trust score, and makes a final security decision.
+    Analyzes a prompt, updates trust score, makes a decision, and logs the event.
     """
     if not request.user_id:
         raise HTTPException(status_code=400, detail="user_id is required.")
@@ -72,13 +74,22 @@ async def analyze_prompt_endpoint(request: PromptAnalysisRequest):
     # 1. Analyze the prompt
     analysis_result = calculate_hybrid_risk(request.prompt, request.user_id)
     
-    # 2. Update user trust score based on the analysis label
+    # 2. Update user trust score
     user_trust_info = update_trust_score(request.user_id, analysis_result["final_label"])
     
-    # 3. Make a final decision based on risk and trust
+    # 3. Make a final decision
     decision = make_decision(
         risk_score=analysis_result["final_risk_score"],
         trust_score=user_trust_info["trust_score"]
+    )
+
+    # 4. Log the security event
+    log_security_event(
+        user_id=request.user_id,
+        prompt=request.prompt,
+        analysis=analysis_result,
+        decision=decision.dict(),
+        user_trust=user_trust_info
     )
 
     # Remove MongoDB's internal _id for cleaner API response
@@ -90,6 +101,14 @@ async def analyze_prompt_endpoint(request: PromptAnalysisRequest):
         "user_trust": user_trust_info,
         "decision": decision
     }
+
+@app.get("/logs", response_model=List[SecurityLog], tags=["Monitoring"])
+async def get_logs_endpoint(limit: int = 100):
+    """
+    Retrieves the latest security event logs.
+    """
+    return get_logs_service(limit)
+
 
 
 
