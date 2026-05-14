@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from app.core.db import connect_to_mongo, close_mongo_connection, ping_database
 from app.security.rule_analyzer import analyze_prompt as rule_based_analysis
+from app.security.nemotron_analyzer import analyze_prompt_with_nemotron as nemotron_analysis
 
 load_dotenv()
 
@@ -51,11 +52,19 @@ async def db_health():
         return {"status": "ok", "database_connection": "successful"}
     return {"status": "error", "database_connection": "failed"}
 
-@app.post("/analyze-prompt", tags=["Security"])
-async def analyze_prompt_endpoint(request: PromptAnalysisRequest):
+@app.post("/analyze-prompt/rules", tags=["Security"])
+async def analyze_prompt_rules_endpoint(request: PromptAnalysisRequest):
     """
     Analyzes a prompt using the rule-based security analyzer.
     """
     return rule_based_analysis(request.prompt)
+
+@app.post("/analyze-prompt/nemotron", tags=["Security"])
+async def analyze_prompt_nemotron_endpoint(request: PromptAnalysisRequest):
+    """
+    Analyzes a prompt using the Nemotron AI security classifier.
+    """
+    return nemotron_analysis(request.prompt)
+
 
 
