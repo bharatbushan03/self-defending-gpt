@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from app.core.db import connect_to_mongo, close_mongo_connection, ping_database
 from app.security.rule_analyzer import analyze_prompt as rule_based_analysis
 from app.security.nemotron_analyzer import analyze_prompt_with_nemotron as nemotron_analysis
+from app.security.risk_engine import calculate_hybrid_risk
 
 load_dotenv()
 
@@ -34,6 +35,7 @@ app.add_middleware(
 
 class PromptAnalysisRequest(BaseModel):
     prompt: str
+    user_id: str = None
 
 @app.get("/", tags=["Health Check"])
 async def root():
@@ -65,6 +67,14 @@ async def analyze_prompt_nemotron_endpoint(request: PromptAnalysisRequest):
     Analyzes a prompt using the Nemotron AI security classifier.
     """
     return nemotron_analysis(request.prompt)
+
+@app.post("/analyze-prompt/hybrid", tags=["Security"])
+async def analyze_prompt_hybrid_endpoint(request: PromptAnalysisRequest):
+    """
+    Analyzes a prompt using the hybrid risk scoring engine.
+    """
+    return calculate_hybrid_risk(request.prompt, request.user_id)
+
 
 
 
