@@ -1,43 +1,28 @@
-from typing import List, Dict
+from pymongo.database import Database
 from pymongo import DESCENDING
+from typing import List, Dict
+
 from app.core.db import get_database
 from app.models.log import SecurityLog
 
-def log_security_event(
-    user_id: str,
-    prompt: str,
-    analysis: Dict,
-    decision: Dict,
-    user_trust: Dict
-):
+def create_security_log(log_data: SecurityLog) -> Dict:
     """
-    Logs a complete security event to the database.
+    Inserts a new security log into the database.
 
     Args:
-        user_id: The ID of the user.
-        prompt: The user's prompt.
-        analysis: The result from the hybrid risk engine.
-        decision: The final decision from the decision engine.
-        user_trust: The user's trust score information.
+        log_data: A SecurityLog object containing all the log details.
+
+    Returns:
+        The inserted log document as a dictionary.
     """
     db = get_database()
     logs_collection = db["logs"]
     
-    log_entry = SecurityLog(
-        user_id=user_id,
-        prompt=prompt,
-        label=analysis.get("final_label"),
-        risk_score=analysis.get("final_risk_score"),
-        action=decision.get("action"),
-        reauth_required=decision.get("reauth_required"),
-        reasons=analysis.get("reasons", []),
-        attack_type=analysis.get("attack_type"),
-        trust_score=user_trust.get("trust_score")
-    )
-    
-    logs_collection.insert_one(log_entry.dict())
+    inserted_log = logs_collection.insert_one(log_data.dict())
+    created_log = logs_collection.find_one({"_id": inserted_log.inserted_id})
+    return created_log
 
-def get_logs(limit: int = 100) -> List[Dict]:
+def get_security_logs(limit: int = 100) -> List[Dict]:
     """
     Retrieves the latest security logs from the database.
 
@@ -50,8 +35,8 @@ def get_logs(limit: int = 100) -> List[Dict]:
     db = get_database()
     logs_collection = db["logs"]
     
-    # Find logs, sort by timestamp descending, and limit the result.
-    # The projection `{"_id": 0}` excludes the MongoDB _id field.
-    logs = logs_collection.find({}, {"_id": 0}).sort("timestamp", DESCENDING).limit(limit)
+    # Sort by timestamp in descending order to get the latest logs first
+    logs = logs_collection.find().sort("timestamp", DESCENDING).limit(limit)
     
-    return list(logs)
+    # Hide the internal _id field
+    return [{**log, "_id": str(log["_id"])} for log in logs]

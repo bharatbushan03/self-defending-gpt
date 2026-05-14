@@ -10,7 +10,7 @@ from app.security.risk_engine import calculate_hybrid_risk
 from app.services.trust_service import update_trust_score
 from app.security.decision_engine import make_decision
 from app.models.decision import Decision
-from app.services.logging_service import log_security_event, get_logs as get_logs_service
+from app.services.logging_service import create_security_log, get_security_logs
 from app.models.log import SecurityLog
 
 load_dotenv()
@@ -84,15 +84,20 @@ async def analyze_prompt_endpoint(request: PromptAnalysisRequest):
     )
 
     # 4. Log the security event
-    log_security_event(
+    log_entry = SecurityLog(
         user_id=request.user_id,
         prompt=request.prompt,
-        analysis=analysis_result,
-        decision=decision.dict(),
-        user_trust=user_trust_info
+        label=analysis_result["final_label"],
+        risk_score=analysis_result["final_risk_score"],
+        action=decision.action,
+        reauth_required=decision.reauth_required,
+        reasons=analysis_result["reasons"],
+        attack_type=analysis_result["attack_type"],
+        trust_score=user_trust_info["trust_score"]
     )
+    create_security_log(log_entry)
 
-    # Remove MongoDB's internal _id for cleaner API response
+    # Clean up for response
     if "_id" in user_trust_info:
         del user_trust_info["_id"]
 
@@ -102,12 +107,17 @@ async def analyze_prompt_endpoint(request: PromptAnalysisRequest):
         "decision": decision
     }
 
-@app.get("/logs", response_model=List[SecurityLog], tags=["Monitoring"])
+@app.get("/logs", response_model=List[Dict], tags=["Logging"])
 async def get_logs_endpoint(limit: int = 100):
     """
-    Retrieves the latest security event logs.
+    Retrieves the latest security logs.
     """
-    return get_logs_service(limit)
+    logs = get_security_logs(limit)
+    # The _id is already handled in the service, but as a safeguard:
+    for log in logs:
+        if "_id" in log:
+            log["_id"] = str(log["_id"])
+    return logs
 
 
 
