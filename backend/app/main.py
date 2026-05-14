@@ -6,10 +6,10 @@ from pydantic import BaseModel
 from typing import Dict
 
 from app.core.db import connect_to_mongo, close_mongo_connection, ping_database
-from app.security.rule_analyzer import analyze_prompt as rule_based_analysis
-from app.security.nemotron_analyzer import analyze_prompt_with_nemotron as nemotron_analysis
 from app.security.risk_engine import calculate_hybrid_risk
 from app.services.trust_service import update_trust_score
+from app.security.decision_engine import make_decision
+from app.models.decision import Decision
 
 load_dotenv()
 
@@ -42,6 +42,7 @@ class PromptAnalysisRequest(BaseModel):
 class PromptAnalysisResponse(BaseModel):
     analysis: Dict
     user_trust: Dict
+    decision: Decision
 
 @app.get("/", tags=["Health Check"])
 async def root():
@@ -63,7 +64,7 @@ async def db_health():
 @app.post("/analyze-prompt", response_model=PromptAnalysisResponse, tags=["Security"])
 async def analyze_prompt_endpoint(request: PromptAnalysisRequest):
     """
-    Analyzes a prompt using the hybrid risk engine and updates the user's trust score.
+    Analyzes a prompt, updates trust score, and makes a final security decision.
     """
     if not request.user_id:
         raise HTTPException(status_code=400, detail="user_id is required.")
@@ -74,14 +75,22 @@ async def analyze_prompt_endpoint(request: PromptAnalysisRequest):
     # 2. Update user trust score based on the analysis label
     user_trust_info = update_trust_score(request.user_id, analysis_result["final_label"])
     
+    # 3. Make a final decision based on risk and trust
+    decision = make_decision(
+        risk_score=analysis_result["final_risk_score"],
+        trust_score=user_trust_info["trust_score"]
+    )
+
     # Remove MongoDB's internal _id for cleaner API response
     if "_id" in user_trust_info:
         del user_trust_info["_id"]
 
     return {
         "analysis": analysis_result,
-        "user_trust": user_trust_info
+        "user_trust": user_trust_info,
+        "decision": decision
     }
+
 
 
 
