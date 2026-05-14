@@ -1,13 +1,15 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
 from pydantic import BaseModel
+from typing import Dict
 
 from app.core.db import connect_to_mongo, close_mongo_connection, ping_database
 from app.security.rule_analyzer import analyze_prompt as rule_based_analysis
 from app.security.nemotron_analyzer import analyze_prompt_with_nemotron as nemotron_analysis
 from app.security.risk_engine import calculate_hybrid_risk
+from app.services.trust_service import update_trust_score
 
 load_dotenv()
 
@@ -35,7 +37,11 @@ app.add_middleware(
 
 class PromptAnalysisRequest(BaseModel):
     prompt: str
-    user_id: str = None
+    user_id: str
+
+class PromptAnalysisResponse(BaseModel):
+    analysis: Dict
+    user_trust: Dict
 
 @app.get("/", tags=["Health Check"])
 async def root():
@@ -54,26 +60,29 @@ async def db_health():
         return {"status": "ok", "database_connection": "successful"}
     return {"status": "error", "database_connection": "failed"}
 
-@app.post("/analyze-prompt/rules", tags=["Security"])
-async def analyze_prompt_rules_endpoint(request: PromptAnalysisRequest):
+@app.post("/analyze-prompt", response_model=PromptAnalysisResponse, tags=["Security"])
+async def analyze_prompt_endpoint(request: PromptAnalysisRequest):
     """
-    Analyzes a prompt using the rule-based security analyzer.
+    Analyzes a prompt using the hybrid risk engine and updates the user's trust score.
     """
-    return rule_based_analysis(request.prompt)
+    if not request.user_id:
+        raise HTTPException(status_code=400, detail="user_id is required.")
 
-@app.post("/analyze-prompt/nemotron", tags=["Security"])
-async def analyze_prompt_nemotron_endpoint(request: PromptAnalysisRequest):
-    """
-    Analyzes a prompt using the Nemotron AI security classifier.
-    """
-    return nemotron_analysis(request.prompt)
+    # 1. Analyze the prompt
+    analysis_result = calculate_hybrid_risk(request.prompt, request.user_id)
+    
+    # 2. Update user trust score based on the analysis label
+    user_trust_info = update_trust_score(request.user_id, analysis_result["final_label"])
+    
+    # Remove MongoDB's internal _id for cleaner API response
+    if "_id" in user_trust_info:
+        del user_trust_info["_id"]
 
-@app.post("/analyze-prompt/hybrid", tags=["Security"])
-async def analyze_prompt_hybrid_endpoint(request: PromptAnalysisRequest):
-    """
-    Analyzes a prompt using the hybrid risk scoring engine.
-    """
-    return calculate_hybrid_risk(request.prompt, request.user_id)
+    return {
+        "analysis": analysis_result,
+        "user_trust": user_trust_info
+    }
+
 
 
 
