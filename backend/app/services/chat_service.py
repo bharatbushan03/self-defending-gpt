@@ -3,15 +3,19 @@ import logging
 
 from app.core.config import settings
 
+from typing import List, Dict
+
 # A simple system prompt for the chatbot persona
 CHATBOT_SYSTEM_PROMPT = "You are a helpful and friendly assistant."
 
-def get_chatbot_response(prompt: str) -> str:
+def get_chatbot_response(prompt: str, history: List[Dict] = None) -> str:
     """
-    Gets a response from the NVIDIA Nemotron model to a user's prompt.
+    Gets a response from the NVIDIA Nemotron model to a user's prompt,
+    considering the conversation history.
 
     Args:
-        prompt: The user's prompt.
+        prompt: The user's current prompt.
+        history: A list of previous messages in the conversation.
 
     Returns:
         The chatbot's response as a string, or an error message if the API call fails.
@@ -26,11 +30,14 @@ def get_chatbot_response(prompt: str) -> str:
         "Content-Type": "application/json",
     }
 
+    # Construct the messages payload
+    messages = [{"role": "system", "content": CHATBOT_SYSTEM_PROMPT}]
+    if history:
+        messages.extend(history)
+    messages.append({"role": "user", "content": prompt})
+
     payload = {
-        "messages": [
-            {"role": "system", "content": CHATBOT_SYSTEM_PROMPT},
-            {"role": "user", "content": prompt}
-        ],
+        "messages": messages,
         "temperature": 0.7,
         "top_p": 1.0,
         "max_tokens": 1024,

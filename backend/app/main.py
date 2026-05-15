@@ -14,6 +14,7 @@ from app.services.logging_service import create_security_log, get_security_logs
 from app.models.log import SecurityLog
 from app.services.chat_service import get_chatbot_response
 from app.models.chat import ChatRequest, ChatResponse
+from app.services import memory_service
 
 load_dotenv()
 
@@ -90,19 +91,18 @@ async def secure_chat_endpoint(request: ChatRequest):
     )
     create_security_log(log_entry)
 
-    # 5. Handle BLOCK action
+    # 5. Handle based on decision
+    chatbot_response = ""
     if decision.action == "BLOCK":
-        return ChatResponse(
-            response="Your request has been blocked for security reasons.",
-            action=decision.action,
-            message=decision.message,
-            risk_score=analysis_result["final_risk_score"],
-            trust_score=user_trust_info["trust_score"],
-            reauth_required=decision.reauth_required
-        )
-
-    # 6. Handle ALLOW or WARN action
-    chatbot_response = get_chatbot_response(request.prompt)
+        chatbot_response = "Your request has been blocked for security reasons."
+    else:
+        # If allowed or warned, get conversation history and generate response
+        history = memory_service.get_conversation_history(request.user_id)
+        chatbot_response = get_chatbot_response(request.prompt, history)
+        
+        # Store the user message and the assistant's response in history
+        memory_service.store_message(request.user_id, "user", request.prompt)
+        memory_service.store_message(request.user_id, "assistant", chatbot_response)
 
     return ChatResponse(
         response=chatbot_response,
@@ -110,11 +110,11 @@ async def secure_chat_endpoint(request: ChatRequest):
         message=decision.message,
         risk_score=analysis_result["final_risk_score"],
         trust_score=user_trust_info["trust_score"],
-        reauth_required=decision.reauth_required
+        reasons=analysis_result["reasons"]
     )
 
 
-@app.get("/logs", response_model=List[Dict], tags=["Logging"])
+@app.get("/logs", response_model=List[Dict], tags=["Admin"])
 async def get_logs_endpoint(limit: int = 100):
     """
     Retrieves the latest security logs.
