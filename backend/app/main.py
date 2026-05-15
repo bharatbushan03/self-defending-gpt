@@ -12,6 +12,8 @@ from app.security.decision_engine import make_decision
 from app.models.decision import Decision
 from app.services.logging_service import create_security_log, get_security_logs
 from app.models.log import SecurityLog
+from app.services.chat_service import get_chatbot_response
+from app.models.chat import ChatRequest, ChatResponse
 
 load_dotenv()
 
@@ -37,15 +39,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-class PromptAnalysisRequest(BaseModel):
-    prompt: str
-    user_id: str
-
-class PromptAnalysisResponse(BaseModel):
-    analysis: Dict
-    user_trust: Dict
-    decision: Decision
-
 @app.get("/", tags=["Health Check"])
 async def root():
     """
@@ -63,10 +56,10 @@ async def db_health():
         return {"status": "ok", "database_connection": "successful"}
     return {"status": "error", "database_connection": "failed"}
 
-@app.post("/analyze-prompt", response_model=PromptAnalysisResponse, tags=["Security"])
-async def analyze_prompt_endpoint(request: PromptAnalysisRequest):
+@app.post("/chat", response_model=ChatResponse, tags=["Chat"])
+async def secure_chat_endpoint(request: ChatRequest):
     """
-    Analyzes a prompt, updates trust score, makes a decision, and logs the event.
+    Handles a user chat request through the full security pipeline.
     """
     if not request.user_id:
         raise HTTPException(status_code=400, detail="user_id is required.")
@@ -97,15 +90,29 @@ async def analyze_prompt_endpoint(request: PromptAnalysisRequest):
     )
     create_security_log(log_entry)
 
-    # Clean up for response
-    if "_id" in user_trust_info:
-        del user_trust_info["_id"]
+    # 5. Handle BLOCK action
+    if decision.action == "BLOCK":
+        return ChatResponse(
+            response="Your request has been blocked for security reasons.",
+            action=decision.action,
+            message=decision.message,
+            risk_score=analysis_result["final_risk_score"],
+            trust_score=user_trust_info["trust_score"],
+            reauth_required=decision.reauth_required
+        )
 
-    return {
-        "analysis": analysis_result,
-        "user_trust": user_trust_info,
-        "decision": decision
-    }
+    # 6. Handle ALLOW or WARN action
+    chatbot_response = get_chatbot_response(request.prompt)
+
+    return ChatResponse(
+        response=chatbot_response,
+        action=decision.action,
+        message=decision.message,
+        risk_score=analysis_result["final_risk_score"],
+        trust_score=user_trust_info["trust_score"],
+        reauth_required=decision.reauth_required
+    )
+
 
 @app.get("/logs", response_model=List[Dict], tags=["Logging"])
 async def get_logs_endpoint(limit: int = 100):
