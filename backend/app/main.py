@@ -15,6 +15,7 @@ from app.models.log import SecurityLog
 from app.services.chat_service import get_chatbot_response
 from app.models.chat import ChatRequest, ChatResponse
 from app.services import memory_service
+from app.services import analytics_service
 
 load_dotenv()
 
@@ -125,6 +126,33 @@ async def get_logs_endpoint(limit: int = 100):
         if "_id" in log:
             log["_id"] = str(log["_id"])
     return logs
+
+# --- Analytics Endpoints for SOC Dashboard ---
+
+@app.get("/analytics/summary", tags=["Analytics"])
+async def get_summary():
+    """Provides a summary of security analytics."""
+    return analytics_service.get_summary_analytics()
+
+@app.get("/analytics/risk-distribution", tags=["Analytics"])
+async def get_risk_dist():
+    """Provides the distribution of requests by risk label."""
+    return analytics_service.get_risk_distribution()
+
+@app.get("/analytics/attack-trends", tags=["Analytics"])
+async def get_attack_trends_endpoint(days: int = 30):
+    """Provides the trend of attacks over the last N days."""
+    return analytics_service.get_attack_trends(days)
+
+@app.get("/analytics/top-risky-users", tags=["Analytics"])
+async def get_top_users_endpoint(limit: int = 5):
+    """Identifies the top N riskiest users."""
+    return analytics_service.get_top_risky_users(limit)
+
+@app.get("/analytics/recent-attacks", tags=["Analytics"])
+async def get_recent_attacks_endpoint(limit: int = 10):
+    """Retrieves the most recent N blocked attacks."""
+    return analytics_service.get_recent_attacks(limit)
 
 
 
