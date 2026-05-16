@@ -31,7 +31,16 @@ app.add_event_handler("shutdown", close_mongo_connection)
 
 
 # CORS Configuration
-origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+frontend_origin = os.getenv("FRONTEND_ORIGIN", "").strip()
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "").strip()
+
+origins = []
+if frontend_origin:
+    origins.append(frontend_origin)
+if allowed_origins:
+    origins.extend([origin.strip() for origin in allowed_origins.split(",") if origin.strip()])
+if not origins:
+    origins = ["http://localhost:3000"]
 
 app.add_middleware(
     CORSMiddleware,
