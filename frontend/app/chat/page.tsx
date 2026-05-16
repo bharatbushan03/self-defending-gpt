@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 
 type ChatMessage = {
   prompt: string;
@@ -29,6 +29,11 @@ export default function Chat() {
   const sendMessage = async () => {
     const nextPrompt = prompt.trim();
     if (!nextPrompt || loading) return;
+
+    if (!API_BASE) {
+      setError("NEXT_PUBLIC_API_URL is not configured.");
+      return;
+    }
 
     setLoading(true);
     setError(null);
@@ -62,7 +67,7 @@ export default function Chat() {
       setPrompt("");
     } catch (err) {
       console.error("Failed to send message:", err);
-      setError(`Unable to reach the backend at ${API_BASE}.`);
+      setError("Unable to reach the backend. Check NEXT_PUBLIC_API_URL.");
     } finally {
       setLoading(false);
 

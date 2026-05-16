@@ -1,18 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
+  CartesianGrid,
   Cell,
+  Legend,
   Line,
   LineChart,
   Pie,
   PieChart,
+  ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis
 } from "recharts";
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000";
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || "";
 const COLORS = ["#00C49F", "#FFBB28", "#FF4C4C"] as const;
 
 type LogEntry = {
@@ -83,6 +86,12 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!API_BASE) {
+      setError("NEXT_PUBLIC_API_URL is not configured.");
+      setLogs([]);
+      return;
+    }
+
     fetch(`${API_BASE}/logs`)
       .then((res) => res.json())
       .then((data: unknown) => {
@@ -91,12 +100,19 @@ export default function Dashboard() {
       })
       .catch((err) => {
         console.error("Failed to fetch logs:", err);
-        setError(`Cannot connect to backend at ${API_BASE}`);
+        setError("Cannot connect to backend. Check NEXT_PUBLIC_API_URL.");
         setLogs([]);
       });
   }, []);
 
   useEffect(() => {
+    if (!API_BASE) {
+      setChartData([]);
+      setTrendData([]);
+      setUsers([]);
+      return;
+    }
+
     fetch(`${API_BASE}/analytics/risk-distribution`)
       .then((res) => res.json())
       .then((data: Record<string, number>) => {
@@ -149,107 +165,243 @@ export default function Dashboard() {
   const safe = logs.filter((log) => normalizeLabel(log.label) === "safe").length;
   const suspicious = logs.filter((log) => normalizeLabel(log.label) === "suspicious").length;
   const malicious = logs.filter((log) => normalizeLabel(log.label) === "malicious").length;
+  const blocked = logs.filter((log) => log.action === "BLOCK").length;
+  const warned = logs.filter((log) => log.action === "WARN").length;
+  const allowed = logs.filter((log) => log.action === "ALLOW").length;
+  const totalEvents = logs.length;
+
+  const latestAttacks = useMemo(() => logs.slice(0, 8), [logs]);
+  const fallbackChartData = [
+    { name: "Safe", value: safe },
+    { name: "Suspicious", value: suspicious },
+    { name: "Malicious", value: malicious }
+  ];
 
   return (
-    <div className="space-y-8 p-6">
-      <h1 className="text-2xl font-bold">Security Dashboard</h1>
+    <div className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-4 py-8 sm:px-6 lg:px-8">
+        <header className="flex flex-col gap-4 border-b border-slate-800 pb-6">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.3em] text-emerald-400">
+                Security Operations Center
+              </p>
+              <h1 className="text-3xl font-semibold text-white sm:text-4xl">Threat Intelligence</h1>
+            </div>
+            <div className="rounded-full border border-slate-800 bg-slate-900 px-4 py-2 text-xs text-slate-300">
+              Live feed: {API_BASE ? API_BASE.replace(/^https?:\/\//, "") : "Not configured"}
+            </div>
+          </div>
+          <p className="max-w-3xl text-sm text-slate-400">
+            Monitor risk posture, containment actions, and attacker behavior from the unified telemetry
+            stream.
+          </p>
+        </header>
 
-      {error && (
-        <div className="rounded border border-red-300 bg-red-100 p-4 text-red-700">
-          Warning: {error}. Make sure the backend API is running on {API_BASE}.
-        </div>
-      )}
+        {error && (
+          <div className="rounded-lg border border-rose-500/40 bg-rose-500/10 p-4 text-sm text-rose-200">
+            Warning: {error}
+          </div>
+        )}
 
-      <div className="grid grid-cols-3 gap-4">
-        <div className="rounded bg-green-100 p-4">Safe: {chartData[0]?.value ?? safe}</div>
-        <div className="rounded bg-yellow-100 p-4">
-          Suspicious: {chartData[1]?.value ?? suspicious}
-        </div>
-        <div className="rounded bg-red-100 p-4">Malicious: {chartData[2]?.value ?? malicious}</div>
+        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/20 via-slate-900 to-slate-950 p-5">
+            <p className="text-xs uppercase tracking-[0.2em] text-emerald-200">Total Events</p>
+            <p className="mt-4 text-3xl font-semibold text-white">{totalEvents}</p>
+            <p className="mt-2 text-xs text-slate-400">Across all ingested prompts</p>
+          </div>
+          <div className="rounded-2xl border border-rose-500/30 bg-gradient-to-br from-rose-500/20 via-slate-900 to-slate-950 p-5">
+            <p className="text-xs uppercase tracking-[0.2em] text-rose-200">Blocked Attacks</p>
+            <p className="mt-4 text-3xl font-semibold text-white">{blocked}</p>
+            <p className="mt-2 text-xs text-slate-400">Immediate containment actions</p>
+          </div>
+          <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-br from-amber-500/20 via-slate-900 to-slate-950 p-5">
+            <p className="text-xs uppercase tracking-[0.2em] text-amber-200">Investigations</p>
+            <p className="mt-4 text-3xl font-semibold text-white">{warned}</p>
+            <p className="mt-2 text-xs text-slate-400">Threats awaiting triage</p>
+          </div>
+          <div className="rounded-2xl border border-cyan-500/30 bg-gradient-to-br from-cyan-500/20 via-slate-900 to-slate-950 p-5">
+            <p className="text-xs uppercase tracking-[0.2em] text-cyan-200">Allowed Sessions</p>
+            <p className="mt-4 text-3xl font-semibold text-white">{allowed}</p>
+            <p className="mt-2 text-xs text-slate-400">Cleared by policy engine</p>
+          </div>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-[1.1fr_1.4fr]">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-white">Risk Distribution</h2>
+                <p className="text-xs text-slate-400">Classification mix for the last ingest window</p>
+              </div>
+              <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">
+                Total: {totalEvents}
+              </span>
+            </div>
+            <div className="mt-6 h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={chartData.length ? chartData : fallbackChartData}
+                    dataKey="value"
+                    nameKey="name"
+                    innerRadius={55}
+                    outerRadius={90}
+                    paddingAngle={3}
+                  >
+                    {(chartData.length ? chartData : fallbackChartData).map((_, index) => (
+                      <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#0f172a",
+                      border: "1px solid #334155",
+                      borderRadius: "8px",
+                      color: "#e2e8f0"
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="mt-6 grid grid-cols-3 gap-3 text-xs text-slate-400">
+              <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
+                <p className="text-slate-300">Safe</p>
+                <p className="mt-2 text-lg font-semibold text-emerald-300">
+                  {chartData[0]?.value ?? safe}
+                </p>
+              </div>
+              <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
+                <p className="text-slate-300">Suspicious</p>
+                <p className="mt-2 text-lg font-semibold text-amber-300">
+                  {chartData[1]?.value ?? suspicious}
+                </p>
+              </div>
+              <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-3">
+                <p className="text-slate-300">Malicious</p>
+                <p className="mt-2 text-lg font-semibold text-rose-300">
+                  {chartData[2]?.value ?? malicious}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-white">Attack Trends</h2>
+                <p className="text-xs text-slate-400">Daily drift for detected attacks</p>
+              </div>
+              <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">
+                Last 14 days
+              </span>
+            </div>
+            <div className="mt-6 h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={trendData} margin={{ top: 8, right: 16, bottom: 0, left: -8 }}>
+                  <CartesianGrid stroke="#1e293b" strokeDasharray="4 4" />
+                  <XAxis dataKey="date" stroke="#94a3b8" tick={{ fontSize: 12 }} />
+                  <YAxis stroke="#94a3b8" tick={{ fontSize: 12 }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#0f172a",
+                      border: "1px solid #334155",
+                      borderRadius: "8px",
+                      color: "#e2e8f0"
+                    }}
+                  />
+                  <Legend iconType="circle" />
+                  <Line type="monotone" dataKey="Malicious" stroke="#fb7185" strokeWidth={2} />
+                  <Line type="monotone" dataKey="Suspicious" stroke="#fbbf24" strokeWidth={2} />
+                  <Line type="monotone" dataKey="Safe" stroke="#34d399" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-[1fr_1.3fr]">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-white">Top Risky Users</h2>
+                <p className="text-xs text-slate-400">Highest cumulative risk scores</p>
+              </div>
+              <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">
+                Users: {users.length}
+              </span>
+            </div>
+            <div className="mt-5 overflow-hidden rounded-xl border border-slate-800">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-950/70 text-xs uppercase tracking-wider text-slate-400">
+                  <tr>
+                    <th className="px-4 py-3">User</th>
+                    <th className="px-4 py-3 text-right">Total Risk</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {users.map((user, index) => (
+                    <tr key={`${user.user}-${index}`} className="border-t border-slate-800">
+                      <td className="px-4 py-3 text-slate-100">{user.user}</td>
+                      <td className="px-4 py-3 text-right font-semibold text-rose-200">
+                        {user.score}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-lg font-semibold text-white">Recent Attacks</h2>
+                <p className="text-xs text-slate-400">Latest suspicious or malicious prompts</p>
+              </div>
+              <span className="rounded-full bg-slate-800 px-3 py-1 text-xs text-slate-300">
+                Showing {latestAttacks.length}
+              </span>
+            </div>
+            <div className="mt-5 overflow-hidden rounded-xl border border-slate-800">
+              <table className="w-full text-left text-sm">
+                <thead className="bg-slate-950/70 text-xs uppercase tracking-wider text-slate-400">
+                  <tr>
+                    <th className="px-4 py-3">Prompt</th>
+                    <th className="px-4 py-3">Label</th>
+                    <th className="px-4 py-3">Risk</th>
+                    <th className="px-4 py-3">Action</th>
+                    <th className="px-4 py-3">Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {latestAttacks.map((log, index) => (
+                    <tr key={`${log.prompt}-${index}`} className="border-t border-slate-800">
+                      <td className="max-w-xs truncate px-4 py-3 text-slate-100">{log.prompt}</td>
+                      <td className="px-4 py-3 text-slate-200">{log.label}</td>
+                      <td className="px-4 py-3 text-slate-200">{log.risk_score}</td>
+                      <td
+                        className={
+                          log.action === "BLOCK"
+                            ? "px-4 py-3 font-semibold text-rose-300"
+                            : log.action === "WARN"
+                              ? "px-4 py-3 text-amber-300"
+                              : "px-4 py-3 text-emerald-300"
+                        }
+                      >
+                        {log.action}
+                      </td>
+                      <td className="px-4 py-3 text-slate-300">
+                        {formatTimestamp(log.timestamp)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
       </div>
-
-      <div className="flex flex-wrap justify-center gap-8">
-        <PieChart width={300} height={300}>
-          <Pie
-            data={
-              chartData.length
-                ? chartData
-                : [
-                    { name: "Safe", value: safe },
-                    { name: "Suspicious", value: suspicious },
-                    { name: "Malicious", value: malicious }
-                  ]
-            }
-            dataKey="value"
-            nameKey="name"
-            outerRadius={100}
-          >
-            {(chartData.length ? chartData : [1, 2, 3]).map((_, index) => (
-              <Cell key={index} fill={COLORS[index % COLORS.length]} />
-            ))}
-          </Pie>
-          <Tooltip />
-        </PieChart>
-
-        <LineChart width={500} height={300} data={trendData}>
-          <XAxis dataKey="date" />
-          <YAxis />
-          <Tooltip />
-          <Line type="monotone" dataKey="Malicious" />
-          <Line type="monotone" dataKey="Suspicious" />
-          <Line type="monotone" dataKey="Safe" />
-        </LineChart>
-      </div>
-
-      <table className="w-full border">
-        <thead>
-          <tr className="bg-gray-200">
-            <th>Prompt</th>
-            <th>Label</th>
-            <th>Risk</th>
-            <th>Action</th>
-            <th>Time</th>
-          </tr>
-        </thead>
-        <tbody>
-          {logs.map((log, index) => (
-            <tr key={`${log.prompt}-${index}`} className="border">
-              <td>{log.prompt}</td>
-              <td>{log.label}</td>
-              <td>{log.risk_score}</td>
-              <td
-                className={
-                  log.action === "BLOCK"
-                    ? "font-bold text-red-600"
-                    : log.action === "WARN"
-                      ? "text-yellow-600"
-                      : "text-green-600"
-                }
-              >
-                {log.action}
-              </td>
-              <td>{formatTimestamp(log.timestamp)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <table className="w-full border">
-        <thead>
-          <tr className="bg-gray-200">
-            <th>User</th>
-            <th>Total Risk Score</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.map((user, index) => (
-            <tr key={`${user.user}-${index}`} className="border">
-              <td>{user.user}</td>
-              <td>{user.score}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }
